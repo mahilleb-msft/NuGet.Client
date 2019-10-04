@@ -438,14 +438,6 @@ Copyright (c) .NET Foundation. All rights reserved.
       <!-- If this is not a PackageReference or ProjectJson project check if packages.config or packages.ProjectName.config exists -->
       <RestoreProjectStyle Condition=" '$(RestoreProjectStyle)' == '' AND (Exists('$(MSBuildProjectDirectory)\packages.config') Or Exists('$(MSBuildProjectDirectory)\packages.$(MSBuildProjectName).config'))">PackagesConfig</RestoreProjectStyle>
       <!-- This project is either a packages.config project or one that does not use NuGet at all. -->
-      <RestoreProjectStyle Condition=" '$(RestoreProjectStyle)' == '' AND
-                           ('$(MSBuildProjectExtension)' == '.csproj'
-                           OR '$(MSBuildProjectExtension)' == '.vbproj'
-                           OR '$(MSBuildProjectExtension)' == '.fsproj'
-                           OR '$(MSBuildProjectExtension)' == '.sfproj'
-                           OR '$(MSBuildProjectExtension)' == '.vcxproj')
-                           AND Exists('$(MSBuildProjectDirectory)\packages.config')">PackagesConfig</RestoreProjectStyle>
-      <!-- This project is either a packages.config project or one that does not use NuGet at all. -->
       <RestoreProjectStyle Condition=" '$(RestoreProjectStyle)' == '' ">Unknown</RestoreProjectStyle>
     </PropertyGroup>
     <PropertyGroup>

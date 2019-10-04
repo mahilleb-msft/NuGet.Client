@@ -243,7 +243,7 @@ namespace NuGet.Build.Tasks
                         DisableParallel = RestoreDisableParallel,
                         Log = log,
                         MachineWideSettings = new XPlatMachineWideSetting(),
- s                      PreLoadedRequestProviders = providers,
+                        PreLoadedRequestProviders = providers,
                         AllowNoOp = !RestoreForce,
                         HideWarningsAndErrors = HideWarningsAndErrors,
                         RestoreForceEvaluate = RestoreForceEvaluate
@@ -457,7 +457,7 @@ namespace NuGet.Build.Tasks
                     collectorLogger)
             };
 
-            // if (EffectivePackageSaveMode != Packaging.PackageSaveMode.None)
+            if (EffectivePackageSaveMode != Packaging.PackageSaveMode.None)
             {
                 projectContext.PackageExtractionContext.PackageSaveMode = packageSaveMode;
             }
@@ -465,9 +465,6 @@ namespace NuGet.Build.Tasks
             using (var cacheContext = new SourceCacheContext())
             {
                 cacheContext.NoCache = RestoreNoCache;
-
-                // TODO: Direct download?
-                // //cacheContext.DirectDownload = DirectDownload;
 
                 var downloadContext = new PackageDownloadContext(cacheContext, repositoryPath, directDownload: false)
                 {
@@ -480,11 +477,6 @@ namespace NuGet.Build.Tasks
                     packageRestoreContext,
                     projectContext,
                     downloadContext);
-
-                if (downloadContext.DirectDownload)
-                {
-                    GetDownloadResultUtility.CleanUpDirectDownloads(downloadContext);
-                }
 
                 return new RestoreSummary(
                     result.Restored,
