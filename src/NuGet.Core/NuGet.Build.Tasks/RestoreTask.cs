@@ -101,6 +101,11 @@ namespace NuGet.Build.Tasks
         /// </summary>
         public bool RestoreForceEvaluate { get; set; }
 
+        /// <summary>
+        /// Directory of solution file
+        /// </summary>
+        public string RestoreSolutionDirectory { get; set; }
+
         public override bool Execute()
         {
 #if DEBUG
@@ -132,6 +137,7 @@ namespace NuGet.Build.Tasks
             log.LogDebug($"(in) RestoreForce '{RestoreForce}'");
             log.LogDebug($"(in) HideWarningsAndErrors '{HideWarningsAndErrors}'");
             log.LogDebug($"(in) RestoreForceEvaluate '{RestoreForceEvaluate}'");
+            log.LogDebug($"(in) RestoreSolutionDirectory '{RestoreSolutionDirectory}'");
 
             try
             {
@@ -393,6 +399,8 @@ namespace NuGet.Build.Tasks
 
                 settings = settings ?? Settings.LoadSettingsGivenConfigPaths(packageSpec.RestoreMetadata.ConfigFilePaths);
 
+                repositoryPath = repositoryPath ?? SettingsUtility.GetRepositoryPath(settings);
+
                 var packagesConfigPath = Path.Combine(Path.GetDirectoryName(packageSpec.RestoreMetadata.ProjectPath), NuGetConstants.PackageReferenceFile);
 
                 firstPackagesConfigPath = firstPackagesConfigPath ?? packagesConfigPath;
@@ -400,6 +408,22 @@ namespace NuGet.Build.Tasks
                 installedPackageReferences.AddRange(GetInstalledPackageReferences(packagesConfigPath, allowDuplicatePackageIds: true));
             }
 
+            if (string.IsNullOrEmpty(repositoryPath) && !string.IsNullOrEmpty(RestoreSolutionDirectory))
+            {
+                repositoryPath = Path.Combine(
+                    RestoreSolutionDirectory,
+                    "packages"
+                );
+            }
+
+            if (string.IsNullOrEmpty(repositoryPath))
+            {
+                throw new InvalidOperationException(
+                    // TODO - localize
+                    "No solution found. Restore against a solution or pass in /p:SolutionDir"
+                    // LocalizedResourceManager.GetString("RestoreCommandCannotDeterminePackagesFolder"));
+                );
+            }
             PackageSourceProvider packageSourceProvider = new PackageSourceProvider(settings);
             var sourceRepositoryProvider = new CommandLineSourceRepositoryProvider(packageSourceProvider);
             var nuGetPackageManager = new NuGetPackageManager(sourceRepositoryProvider, settings, repositoryPath);
@@ -481,10 +505,11 @@ namespace NuGet.Build.Tasks
                 return new RestoreSummary(
                     result.Restored,
                     "packages.config projects",
-                    (IReadOnlyList<string>)settings.GetConfigFilePaths(),
-                    (IReadOnlyList<string>)packageSources.Select(x => x.Source),
+                    settings.GetConfigFilePaths().ToArray(),
+                    packageSources.Select(x => x.Source).ToArray(),
                     installCount,
-                    (IReadOnlyList<IRestoreLogMessage>)collectorLogger.Errors.Concat(ProcessFailedEventsIntoRestoreLogs(failedEvents)));
+                    collectorLogger.Errors.Concat(ProcessFailedEventsIntoRestoreLogs(failedEvents)).ToArray()
+                );
             }
         }
 
