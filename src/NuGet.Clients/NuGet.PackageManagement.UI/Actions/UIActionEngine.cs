@@ -18,6 +18,7 @@ using NuGet.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Task = System.Threading.Tasks.Task;
+using TelemetryPiiPropertyValue = NuGet.Common.Telemetry.TelemetryPiiPropertyValue;
 
 namespace NuGet.PackageManagement.UI
 {
@@ -314,6 +315,9 @@ namespace NuGet.PackageManagement.UI
             var startTime = DateTimeOffset.Now;
             var packageCount = 0;
 
+            IEnumerable<string> addedPackages = null;
+
+
             // Enable granular level telemetry events for nuget ui operation
             uiService.ProjectContext.OperationId = Guid.NewGuid();
 
@@ -345,6 +349,9 @@ namespace NuGet.PackageManagement.UI
                         {
                             var addCount = results.SelectMany(result => result.Added).
                                 Select(package => package.Id).Distinct().Count();
+
+                            // log rich info about added packages
+                            addedPackages = results.SelectMany(result => result.Added).Select(package => package.Id).Distinct();
 
                             var updateCount = results.SelectMany(result => result.Updated).
                                 Select(result => result.New.Id).Distinct().Count();
@@ -443,6 +450,18 @@ namespace NuGet.PackageManagement.UI
                         status,
                         packageCount,
                         duration.TotalSeconds);
+
+                    // log information about added Packages.  Treat package name as PII data.
+                    if (addedPackages != null && addedPackages.Count() > 0)
+                    {
+                        var piiProps = new List<TelemetryPiiPropertyValue>();
+                        foreach (var addedPackage in addedPackages)
+                        {
+                            piiProps.Append(new TelemetryPiiPropertyValue(addedPackage));
+                        }
+                        actionTelemetryEvent.AddComplexProperty("AddedPackages", piiProps);
+                    }
+
 
                     TelemetryActivity.EmitTelemetryEvent(actionTelemetryEvent);
                 }

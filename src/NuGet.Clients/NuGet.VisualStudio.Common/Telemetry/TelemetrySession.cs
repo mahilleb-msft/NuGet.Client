@@ -6,6 +6,7 @@ using NuGet.Common;
 using VsTelemetryEvent = Microsoft.VisualStudio.Telemetry.TelemetryEvent;
 using VsTelemetryService = Microsoft.VisualStudio.Telemetry.TelemetryService;
 using VsTelemetryPiiProperty = Microsoft.VisualStudio.Telemetry.TelemetryPiiProperty;
+using VsTelemetryComplexProperty = Microsoft.VisualStudio.Telemetry.TelemetryComplexProperty;
 
 namespace NuGet.VisualStudio.Telemetry
 {
@@ -40,6 +41,22 @@ namespace NuGet.VisualStudio.Telemetry
             foreach (var pair in telemetryEvent.GetPiiData())
             {
                 vsTelemetryEvent.Properties[VSPropertyNamePrefix + pair.Key] = new VsTelemetryPiiProperty(pair.Value);
+            }
+
+            foreach (var pair in telemetryEvent.GetComplexData())
+            {
+                // determine if the complex type is a scalar TelemetryPiiProperty
+                if (pair.Value is NuGet.Common.Telemetry.TelemetryPiiPropertyValue)
+                {
+
+                }
+                else
+                {
+                    // determine if there are embedded PII values in a list/array type...
+                }
+
+
+                vsTelemetryEvent.Properties[VSPropertyNamePrefix + pair.Key] = new VsTelemetryComplexProperty(pair.Value);
             }
 
             return vsTelemetryEvent;
