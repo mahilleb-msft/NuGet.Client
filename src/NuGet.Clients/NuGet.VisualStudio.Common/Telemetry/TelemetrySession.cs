@@ -43,20 +43,18 @@ namespace NuGet.VisualStudio.Telemetry
                 vsTelemetryEvent.Properties[VSPropertyNamePrefix + pair.Key] = new VsTelemetryPiiProperty(pair.Value);
             }
 
-            foreach (var pair in telemetryEvent.GetComplexData())
+            // serialize PII lists
+            foreach (var piiList in telemetryEvent.GetPiiLists())
             {
-                // determine if the complex type is a scalar TelemetryPiiProperty
-                if (pair.Value is NuGet.Common.Telemetry.TelemetryPiiPropertyValue)
+                // construct a list of PII props
+                System.Collections.Generic.List<VsTelemetryPiiProperty> piiProps = new System.Collections.Generic.List<VsTelemetryPiiProperty>();
+                foreach (var propertyValue in piiList.Value)
                 {
-
-                }
-                else
-                {
-                    // determine if there are embedded PII values in a list/array type...
+                    piiProps.Add(new VsTelemetryPiiProperty(propertyValue));
                 }
 
-
-                vsTelemetryEvent.Properties[VSPropertyNamePrefix + pair.Key] = new VsTelemetryComplexProperty(pair.Value);
+                vsTelemetryEvent.Properties[VSPropertyNamePrefix + piiList.Key] = new VsTelemetryComplexProperty(piiProps.ToArray());
+                
             }
 
             return vsTelemetryEvent;

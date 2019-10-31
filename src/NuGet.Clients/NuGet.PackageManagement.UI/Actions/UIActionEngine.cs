@@ -18,7 +18,6 @@ using NuGet.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Task = System.Threading.Tasks.Task;
-using TelemetryPiiPropertyValue = NuGet.Common.Telemetry.TelemetryPiiPropertyValue;
 
 namespace NuGet.PackageManagement.UI
 {
@@ -316,6 +315,8 @@ namespace NuGet.PackageManagement.UI
             var packageCount = 0;
 
             IEnumerable<string> addedPackages = null;
+            IEnumerable<string> removedPackages = null;
+            IEnumerable<string> updatedPackages = null;
 
 
             // Enable granular level telemetry events for nuget ui operation
@@ -344,6 +345,8 @@ namespace NuGet.PackageManagement.UI
                         {
                             packageCount = results.SelectMany(result => result.Deleted).
                                 Select(package => package.Id).Distinct().Count();
+
+                            removedPackages = results.SelectMany(result => result.Deleted).Select(package => package.Id).Distinct();
                         }
                         else
                         {
@@ -355,6 +358,8 @@ namespace NuGet.PackageManagement.UI
 
                             var updateCount = results.SelectMany(result => result.Updated).
                                 Select(result => result.New.Id).Distinct().Count();
+
+                            updatedPackages = results.SelectMany(result => result.Updated).Select(package => package.Id).Distinct();
 
                             // update packages count
                             packageCount = addCount + updateCount;
@@ -451,17 +456,21 @@ namespace NuGet.PackageManagement.UI
                         packageCount,
                         duration.TotalSeconds);
 
-                    // log information about added Packages.  Treat package name as PII data.
+                    // log information about changed  Packages.  Treat package name as PII data.
                     if (addedPackages != null && addedPackages.Count() > 0)
                     {
-                        var piiProps = new List<TelemetryPiiPropertyValue>();
-                        foreach (var addedPackage in addedPackages)
-                        {
-                            piiProps.Append(new TelemetryPiiPropertyValue(addedPackage));
-                        }
-                        actionTelemetryEvent.AddComplexProperty("AddedPackages", piiProps);
+                        actionTelemetryEvent.AddListOfPiiValues("AddedPackages", addedPackages);
                     }
 
+                    if (removedPackages != null && removedPackages.Count() > 0)
+                    {
+                        actionTelemetryEvent.AddListOfPiiValues("RemovedPackages", removedPackages);
+                    }
+
+                    if (updatedPackages != null && updatedPackages.Count() > 0)
+                    {
+                        actionTelemetryEvent.AddListOfPiiValues("UpdatedPackages", updatedPackages);
+                    }
 
                     TelemetryActivity.EmitTelemetryEvent(actionTelemetryEvent);
                 }
