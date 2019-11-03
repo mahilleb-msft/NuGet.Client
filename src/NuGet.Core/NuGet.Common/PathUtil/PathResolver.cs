@@ -32,6 +32,19 @@ namespace NuGet.Common
             });
         }
 
+        private static IEnumerable<T> GetMatches<T>(
+            IEnumerable<T> source,
+            Func<T, string> getPath,
+            IEnumerable<Regex> filters)
+        {
+            return source.Where(item =>
+            {
+                string path = getPath(item);
+
+                return filters.Any(f => f.IsMatch(path));
+            });
+        }
+
         /// <summary>
         /// Removes files from the source that match any wildcard.
         /// </summary>
@@ -49,6 +62,37 @@ namespace NuGet.Common
             IEnumerable<string> wildcards)
         {
             var matchedFiles = new HashSet<T>(GetMatches(source, getPath, wildcards));
+            List<T> toRemove = source.Where(matchedFiles.Contains).ToList();
+
+            foreach (T item in toRemove)
+            {
+                source.Remove(item);
+            }
+
+            return toRemove;
+        }
+
+        public static IEnumerable<T> GetFilteredPackageFiles<T>(
+            ICollection<T> source,
+            Func<T, string> getPath,
+            IEnumerable<Regex> filters)
+        {
+            if (source == null)
+            {
+                throw new ArgumentNullException(nameof(source));
+            }
+
+            if (getPath == null)
+            {
+                throw new ArgumentNullException(nameof(getPath));
+            }
+
+            if (filters == null)
+            {
+                throw new ArgumentNullException(nameof(filters));
+            }
+
+            var matchedFiles = new HashSet<T>(GetMatches(source, getPath, filters));
             List<T> toRemove = source.Where(matchedFiles.Contains).ToList();
 
             foreach (T item in toRemove)

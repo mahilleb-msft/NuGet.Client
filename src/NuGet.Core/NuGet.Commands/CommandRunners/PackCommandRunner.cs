@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Frameworks;
@@ -39,13 +40,7 @@ namespace NuGet.Commands
             ".json"
         };
 
-        private static readonly string[] DefaultExcludes = new[]
-        {
-            // Exclude previous package files
-            @"**\*".Replace('\\', Path.DirectorySeparatorChar) + NuGetConstants.PackageExtension,
-            // Exclude all files and directories that begin with "."
-            @"**\\.**".Replace('\\', Path.DirectorySeparatorChar), ".**"
-        };
+        private static readonly IReadOnlyList<Regex> DefaultExcludes = GetDefaultExcludes();
 
         // Target file paths to exclude when building the lib package for symbol server scenario
         private static readonly string[] LibPackageExcludes = new[]
@@ -1228,6 +1223,32 @@ namespace NuGet.Commands
             {
                 set.Add(dependency);
             }
+        }
+
+        private static Regex[] GetDefaultExcludes()
+        {
+            var options = RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture;
+
+            if (Path.DirectorySeparatorChar == '/')
+            {
+                return new[]
+                {
+                    // Exclude previous package files
+                    new Regex(@"\.nupkg$", options),
+                    // Exclude all files and directories that begin with "."
+                    new Regex(@"/\.[^/.]*$", options),
+                    new Regex(@"^\.[^/.]*$", options)
+                };
+            }
+
+            return new[]
+            {
+                // Exclude previous package files
+                new Regex(@"\.nupkg$", options),
+                // Exclude all files and directories that begin with "."
+                new Regex(@"\\\.[^\.]*$", options),
+                new Regex(@"^\.[^\.]*$", options)
+            };
         }
     }
 }

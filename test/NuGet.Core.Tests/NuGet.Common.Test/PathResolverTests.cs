@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NuGet.Test.Utility;
 using Xunit;
 
@@ -607,6 +608,73 @@ namespace NuGet.Common.Test
             IEnumerable<string> actualFullPaths = PathResolver.PerformWildcardSearch(_fixture.Path, searchPath);
 
             Verify(expectedResults, actualFullPaths);
+        }
+
+        [Fact]
+        public void GetFilteredPackageFiles_WhenSourceIsNull_Throws()
+        {
+            ICollection<string> source = null;
+
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => PathResolver.GetFilteredPackageFiles(source, _ => _, Enumerable.Empty<Regex>()));
+
+            Assert.Equal("source", exception.ParamName);
+        }
+
+        [Fact]
+        public void GetFilteredPackageFiles_WhenGetPathIsNull_Throws()
+        {
+            Func<string, string> getPath = null;
+
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => PathResolver.GetFilteredPackageFiles(new List<string>(), getPath, Enumerable.Empty<Regex>()));
+
+            Assert.Equal("getPath", exception.ParamName);
+        }
+
+        [Fact]
+        public void GetFilteredPackageFiles_WhenFiltersIsNull_Throws()
+        {
+            IEnumerable<Regex> filters = null;
+
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => PathResolver.GetFilteredPackageFiles(new List<string>(), _ => _, filters));
+
+            Assert.Equal("filters", exception.ParamName);
+        }
+
+        [Fact]
+        public void GetFilteredPackageFiles_WhenWildcardsDoesNotMatchPackageFile_RemovesNothing()
+        {
+            var source = new List<string>() { "a", "b" };
+            IEnumerable<Regex> wildcards = new[] { new Regex("c") };
+
+            IEnumerable<string> removed = PathResolver.GetFilteredPackageFiles(source, _ => _, wildcards);
+
+            Assert.Collection(
+                source,
+                element => Assert.Equal("a", element),
+                element => Assert.Equal("b", element));
+
+            Assert.Empty(removed);
+        }
+
+        [Fact]
+        public void GetFilteredPackageFiles_WhenWildcardsMatchesPackageFile_RemovesMatch()
+        {
+            var source = new List<string>() { "a", "b", "c" };
+            IEnumerable<Regex> wildcards = new[] { new Regex("b") };
+
+            IEnumerable<string> removed = PathResolver.GetFilteredPackageFiles(source, _ => _, wildcards);
+
+            Assert.Collection(
+                source,
+                element => Assert.Equal("a", element),
+                element => Assert.Equal("c", element));
+
+            Assert.Collection(
+                removed,
+                element => Assert.Equal("b", element));
         }
 
         private void Verify(IEnumerable<string> expectedRelativePaths, IEnumerable<string> actualFullPaths)
