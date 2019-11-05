@@ -102,6 +102,7 @@ Copyright (c) .NET Foundation. All rights reserved.
   <UsingTask TaskName="NuGet.Build.Tasks.GetRestoreSettingsTask" AssemblyFile="$(RestoreTaskAssemblyFile)" />
   <UsingTask TaskName="NuGet.Build.Tasks.WarnForInvalidProjectsTask" AssemblyFile="$(RestoreTaskAssemblyFile)" />
   <UsingTask TaskName="NuGet.Build.Tasks.GetReferenceNearestTargetFrameworkTask" AssemblyFile="$(RestoreTaskAssemblyFile)" />
+  <UsingTask TaskName="NuGet.Build.Tasks.NuGetMessageTask" AssemblyFile="$(RestoreTaskAssemblyFile)" />
 
   <!--
     ============================================================
@@ -305,6 +306,7 @@ Copyright (c) .NET Foundation. All rights reserved.
   <Target Name="_GenerateRestoreGraph"
         DependsOnTargets="_FilterRestoreGraphProjectInputItems;_GetAllRestoreProjectPathItems"
         Returns="@(_RestoreGraphEntry)">
+    <NuGetMessageTask Name="DeterminingProjectsToRestore" Importance="High" />
     <Message Text="Generating dg file" Importance="low" />
     <Message Text="%(_RestoreProjectPathItems.Identity)" Importance="low" />
 
