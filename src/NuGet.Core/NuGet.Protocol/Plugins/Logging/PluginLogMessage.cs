@@ -37,8 +37,8 @@ namespace NuGet.Protocol.Plugins
 
             var outerMessage = new JObject(
                 new JProperty("now", _now.ToString("O")), // round-trip format
-                new JProperty("aWorkerThreads", _aWorkerThreads),
-                new JProperty("aComplPortThreads", _aComplPortThreads),
+                new JProperty("awt", _aWorkerThreads),
+                new JProperty("acpt", _aComplPortThreads),
                 new JProperty("type", type),
                 new JProperty("message", message));
 
