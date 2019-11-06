@@ -2,11 +2,29 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace NuGet.Protocol.Plugins
 {
+    internal class RequestProcessingContext
+    {
+        private ISet<MessageMethod> _messageMethodsThatAreFast;
+        public RequestProcessingContext(ISet<MessageMethod> messageMethodsThatAreFast)
+        {
+            _messageMethodsThatAreFast = messageMethodsThatAreFast;
+        }
+
+        public bool IsFastProcessing(MessageMethod messageMethod)
+        {
+            return _messageMethodsThatAreFast.Contains(messageMethod);
+        }
+    }
+
     /// <summary>
     /// Context for an inbound request.
     /// </summary>
@@ -16,8 +34,11 @@ namespace NuGet.Protocol.Plugins
         private readonly CancellationTokenSource _cancellationTokenSource;
         private readonly IConnection _connection;
         private bool _isDisposed;
+//        private bool _isClosed;
         private readonly IPluginLogger _logger;
-
+        //private readonly ConcurrentQueue<InboundRequestData> _requestsToProcess;
+        //private readonly Task _runningThread;
+        private readonly RequestProcessingContext _requestProcessingContext;
         /// <summary>
         /// Gets the request ID.
         /// </summary>
@@ -37,7 +58,16 @@ namespace NuGet.Protocol.Plugins
             IConnection connection,
             string requestId,
             CancellationToken cancellationToken)
-            : this(connection, requestId, cancellationToken, PluginLogger.DefaultInstance)
+            : this(connection, requestId, cancellationToken, new RequestProcessingContext(new HashSet<MessageMethod>()), PluginLogger.DefaultInstance)
+        {
+        }
+
+        internal InboundRequestContext(
+            IConnection connection,
+            string requestId,
+            CancellationToken cancellationToken,
+            IPluginLogger logger)
+            : this(connection, requestId, cancellationToken, new RequestProcessingContext(new HashSet<MessageMethod>()), logger)
         {
         }
 
@@ -58,6 +88,7 @@ namespace NuGet.Protocol.Plugins
             IConnection connection,
             string requestId,
             CancellationToken cancellationToken,
+            RequestProcessingContext requestProcessingContext,
             IPluginLogger logger)
         {
             if (connection == null)
@@ -75,6 +106,11 @@ namespace NuGet.Protocol.Plugins
                 throw new ArgumentNullException(nameof(logger));
             }
 
+            if (requestProcessingContext == null)
+            {
+                throw new ArgumentNullException(nameof(requestProcessingContext));
+            }
+
             _connection = connection;
             RequestId = requestId;
 
@@ -85,6 +121,43 @@ namespace NuGet.Protocol.Plugins
             _cancellationToken = _cancellationTokenSource.Token;
 
             _logger = logger;
+
+            _requestProcessingContext = requestProcessingContext;
+        }
+
+        private async Task ProcessRequestOnCurrentThread(IRequestHandler requestHandler, Message request, IResponseHandler responseHandler)
+        {
+            // Top-level exception handler for a worker pool thread.
+            try
+            {
+                if (_logger.IsEnabled)
+                {
+                    _logger.Write(new TaskLogMessage(_logger.Now, request.RequestId, request.Method, request.Type, TaskState.Executing));
+                }
+
+                await requestHandler.HandleResponseAsync(
+                    _connection,
+                    request,
+                    responseHandler,
+                    _cancellationToken);
+            }
+            catch (OperationCanceledException) when (_cancellationToken.IsCancellationRequested)
+            {
+                var response = MessageUtilities.Create(request.RequestId, MessageType.Cancel, request.Method);
+
+                await _connection.SendAsync(response, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                BeginFaultAsync(request, ex);
+            }
+            finally
+            {
+                if (_logger.IsEnabled)
+                {
+                    _logger.Write(new TaskLogMessage(_logger.Now, request.RequestId, request.Method, request.Type, TaskState.Completed));
+                }
+            }
         }
 
         /// <summary>
@@ -96,6 +169,7 @@ namespace NuGet.Protocol.Plugins
             {
                 return;
             }
+            //_isClosed = true;
 
             try
             {
@@ -109,7 +183,10 @@ namespace NuGet.Protocol.Plugins
             }
 
             // Do not dispose of _connection or _logger.  This context does not own them.
-
+            //while (_requestsToProcess.TryDequeue(out _))
+            //{
+            //    // do nothing
+            //}
             GC.SuppressFinalize(this);
 
             _isDisposed = true;
@@ -211,41 +288,17 @@ namespace NuGet.Protocol.Plugins
                 _logger.Write(new TaskLogMessage(_logger.Now, request.RequestId, request.Method, request.Type, TaskState.Queued));
             }
 
-            Task.Run(async () =>
+            if (_requestProcessingContext.IsFastProcessing(request.Method))
+            {
+                ProcessRequestOnCurrentThread(requestHandler, request, responseHandler).GetAwaiter().GetResult();
+            }
+            else
+            {
+                Task.Run(async () =>
                 {
-                    // Top-level exception handler for a worker pool thread.
-                    try
-                    {
-                        if (_logger.IsEnabled)
-                        {
-                            _logger.Write(new TaskLogMessage(_logger.Now, request.RequestId, request.Method, request.Type, TaskState.Executing));
-                        }
-
-                        await requestHandler.HandleResponseAsync(
-                            _connection,
-                            request,
-                            responseHandler,
-                            _cancellationToken);
-                    }
-                    catch (OperationCanceledException) when (_cancellationToken.IsCancellationRequested)
-                    {
-                        var response = MessageUtilities.Create(request.RequestId, MessageType.Cancel, request.Method);
-
-                        await _connection.SendAsync(response, CancellationToken.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        BeginFaultAsync(request, ex);
-                    }
-                    finally
-                    {
-                        if (_logger.IsEnabled)
-                        {
-                            _logger.Write(new TaskLogMessage(_logger.Now, request.RequestId, request.Method, request.Type, TaskState.Completed));
-                        }
-                    }
-                },
-                _cancellationToken);
+                    await ProcessRequestOnCurrentThread(requestHandler, request, responseHandler);
+                }, _cancellationToken);
+            }
         }
 
         /// <summary>

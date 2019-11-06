@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,6 +24,7 @@ namespace NuGet.Protocol.Plugins
         private readonly IPluginLogger _logger;
         private readonly ConcurrentDictionary<string, OutboundRequestContext> _outboundRequestContexts;
 
+        public static bool IsNuGet { get; set; }
         /// <summary>
         /// Gets the request handlers for use by the dispatcher.
         /// </summary>
@@ -618,7 +620,7 @@ namespace NuGet.Protocol.Plugins
                 exception = ex;
             }
 
-            var requestContext = CreateInboundRequestContext(message, cancellationToken);
+            var requestContext = CreateInboundRequestContext(message, IsNuGet, cancellationToken);
 
             if (exception == null && requestHandler != null)
             {
@@ -693,8 +695,17 @@ namespace NuGet.Protocol.Plugins
 
         private InboundRequestContext CreateInboundRequestContext(
             Message message,
+            bool isNuGet,
             CancellationToken cancellationToken)
         {
+            // if is nuget do something special.
+            if (isNuGet)
+            {
+                var set = new HashSet<MessageMethod>();
+                set.Add(MessageMethod.Handshake);
+                set.Add(MessageMethod.Log);
+                new RequestProcessingContext(set);
+            }
             return new InboundRequestContext(
                 _connection,
                 message.RequestId,

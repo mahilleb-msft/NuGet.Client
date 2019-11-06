@@ -102,19 +102,6 @@ namespace NuGet.Build.Tasks
 #endif
             var log = new MSBuildLogger(Log);
 
-            //int _minWorkerThreads;
-            //int _minCompletionPortThreads;
-            //ThreadPool.GetMinThreads(out _minWorkerThreads, out _minCompletionPortThreads);
-            //var wantedThreads = Environment.ProcessorCount * 2;
-
-            //log.LogMinimal(string.Format("Current min worker threads {0}, currrent min completion port threads {1}, wanted min threads {2}", _minWorkerThreads, _minCompletionPortThreads, wantedThreads));
-
-            //if (_minWorkerThreads < wantedThreads)
-            //{
-            //    ThreadPool.SetMinThreads(wantedThreads, _minCompletionPortThreads);
-            //    log.LogMinimal("Increasing the min count");
-            //}
-
             // Log inputs
             log.LogDebug($"(in) RestoreGraphItems Count '{RestoreGraphItems?.Count() ?? 0}'");
             log.LogDebug($"(in) RestoreDisableParallel '{RestoreDisableParallel}'");

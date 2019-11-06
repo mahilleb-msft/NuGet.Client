@@ -337,6 +337,7 @@ namespace NuGet.Protocol.Plugins
             _pluginOperationClaims = new ConcurrentDictionary<PluginRequestKey, Lazy<Task<IReadOnlyList<OperationClaim>>>>();
             _pluginUtilities = new ConcurrentDictionary<string, Lazy<IPluginMulticlientUtilities>>(
                 StringComparer.OrdinalIgnoreCase);
+            MessageDispatcher.IsNuGet = true;
         }
 
         private async Task<IReadOnlyList<OperationClaim>> GetPluginOperationClaimsAsync(
