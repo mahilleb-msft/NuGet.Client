@@ -10,6 +10,9 @@ using NuGet.Configuration;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using NuGet.Protocol.VisualStudio;
+using Microsoft.VisualStudio.Threading;
+using NuGet.VisualStudio;
+using System.Threading.Tasks;
 
 namespace NuGet.PackageManagement.VisualStudio
 {
@@ -54,17 +57,26 @@ namespace NuGet.PackageManagement.VisualStudio
 
         private void EnsureInitialized()
         {
-            LazyInitializer.EnsureInitialized(ref _packageSourceProvider,
-                ref _initialized,
-                ref _lockObj,
-                () =>
-                    {
-                        #pragma warning disable CS0618 // Type or member is obsolete
-                        IPackageSourceProvider packageSourceProvider = new PackageSourceProvider(_settings.Value, enablePackageSourcesChangedEvent: true);
-                        #pragma warning restore CS0618 // Type or member is obsolete
-                        packageSourceProvider.PackageSourcesChanged += ResetRepositories;
-                        return packageSourceProvider;
-                    });
+            // this check is to avoid switching to a background thread if settings were already initialized
+            if (!_initialized)
+            {
+                NuGetUIThreadHelper.JoinableTaskFactory.Run(async delegate
+                {
+                    await TaskScheduler.Default;
+
+                    LazyInitializer.EnsureInitialized(ref _packageSourceProvider,
+                        ref _initialized,
+                        ref _lockObj,
+                        () =>
+                        {
+                            #pragma warning disable CS0618 // Type or member is obsolete
+                            IPackageSourceProvider packageSourceProvider = new PackageSourceProvider(_settings.Value, enablePackageSourcesChangedEvent: true);
+                            #pragma warning restore CS0618 // Type or member is obsolete
+                            packageSourceProvider.PackageSourcesChanged += ResetRepositories;
+                            return packageSourceProvider;
+                        });
+                });
+            }
         }
 
         /// <summary>
