@@ -58,7 +58,7 @@ namespace NuGet.PackageManagement.VisualStudio
         private void EnsureInitialized()
         {
             // this check is to avoid switching to a background thread if settings were already initialized
-            if (!_initialized)
+            if (!Volatile.Read(ref _initialized))
             {
                 NuGetUIThreadHelper.JoinableTaskFactory.Run(async delegate
                 {
