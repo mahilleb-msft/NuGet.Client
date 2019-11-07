@@ -106,7 +106,7 @@ namespace NuGet.Build.Tasks
             var log = new MSBuildLogger(Log);
 
             var currProcessId = Process.GetCurrentProcess().Id;
-            var outputLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "..", "..", "..", $"dotnet-{currProcessId}.nettrace");
+            var outputLocation = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "..", "..", "..", $"dotnet-{currProcessId}.nettrace"));
             var argument = $"dotnet trace collect -p {currProcessId} -o {outputLocation}";
 
             // .dotnet/sdk/3.0.100/MSBuild.dll
