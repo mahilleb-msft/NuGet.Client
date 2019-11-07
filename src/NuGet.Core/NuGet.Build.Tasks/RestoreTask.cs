@@ -4,8 +4,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Build.Framework;
@@ -102,18 +105,31 @@ namespace NuGet.Build.Tasks
 #endif
             var log = new MSBuildLogger(Log);
 
-            //int _minWorkerThreads;
-            //int _minCompletionPortThreads;
-            //ThreadPool.GetMinThreads(out _minWorkerThreads, out _minCompletionPortThreads);
-            //var wantedThreads = Environment.ProcessorCount * 2;
+            var currProcessId = Process.GetCurrentProcess().Id;
+            var outputLocation = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "..", "..", "..", $"dotnet-{currProcessId}.nettrace");
+            var argument = $"dotnet trace collect -p {currProcessId} -o {outputLocation}";
 
-            //log.LogMinimal(string.Format("Current min worker threads {0}, currrent min completion port threads {1}, wanted min threads {2}", _minWorkerThreads, _minCompletionPortThreads, wantedThreads));
-
-            //if (_minWorkerThreads < wantedThreads)
-            //{
-            //    ThreadPool.SetMinThreads(wantedThreads, _minCompletionPortThreads);
-            //    log.LogMinimal("Increasing the min count");
-            //}
+            // .dotnet/sdk/3.0.100/MSBuild.dll
+            log.LogMinimal($"Running dotnet {argument}");
+            try
+            {
+                var startinfo = new ProcessStartInfo()
+                {
+                    FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
+                    Arguments = argument,
+                    UseShellExecute = false,
+                    RedirectStandardError = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    StandardOutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                };
+                Process.Start(startinfo);
+            }
+            catch (Exception e)
+            {
+                log.LogMinimal("Could not start the process: " + e.Message + e.StackTrace);
+            }
 
             // Log inputs
             log.LogDebug($"(in) RestoreGraphItems Count '{RestoreGraphItems?.Count() ?? 0}'");
