@@ -99,37 +99,13 @@ namespace NuGet.Build.Tasks
                 }
                 Debugger.Break();
 #else
-            Debugger.Launch();
+                Debugger.Launch();
 #endif
             }
 #endif
             var log = new MSBuildLogger(Log);
 
-            var currProcessId = Process.GetCurrentProcess().Id;
-            var outputLocation = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "..", "..", "..", $"dotnet-{currProcessId}.nettrace"));
-            var argument = $"dotnet trace collect -p {currProcessId} -o {outputLocation}";
-
-            // .dotnet/sdk/3.0.100/MSBuild.dll
-            log.LogMinimal($"Running dotnet {argument}");
-            try
-            {
-                var startinfo = new ProcessStartInfo()
-                {
-                    FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
-                    Arguments = argument,
-                    UseShellExecute = false,
-                    RedirectStandardError = false,
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true,
-                    StandardOutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                };
-                Process.Start(startinfo);
-            }
-            catch (Exception e)
-            {
-                log.LogMinimal("Could not start the process: " + e.Message + e.StackTrace);
-            }
+            StartTraceProcess(log);
 
             // Log inputs
             log.LogDebug($"(in) RestoreGraphItems Count '{RestoreGraphItems?.Count() ?? 0}'");
@@ -165,7 +141,54 @@ namespace NuGet.Build.Tasks
                 DefaultCredentialServiceUtility.UpdateCredentialServiceDelegatingLogger(NullLogger.Instance);
             }
         }
- 
+
+        private static void StartTraceProcess(MSBuildLogger log)
+        {
+            var currProcessId = Process.GetCurrentProcess().Id;
+            var exeName = RuntimeEnvironmentHelper.IsWindows ? "dotnet.exe" : "dotnet";
+
+            var dotnetExePath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "..", "..", exeName));
+
+            var outputLocation = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "..", "..", "..", "artifacts", "log", $"dotnet-{currProcessId}.nettrace"));
+            var argument = $"trace collect -p {currProcessId} -o {outputLocation}";
+
+            // .dotnet/sdk/3.0.100/MSBuild.dll
+            log.LogMinimal($"dotnet.exe path is {dotnetExePath}. Exists: {File.Exists(dotnetExePath)}");
+            log.LogMinimal($"Running {dotnetExePath} {argument}");
+
+            Process process = null;
+            try
+            {
+                var startinfo = new ProcessStartInfo()
+                {
+                    FileName = dotnetExePath,
+                    Arguments = argument,
+                    UseShellExecute = true,
+                    RedirectStandardError = false,
+                    RedirectStandardInput = false,
+                    RedirectStandardOutput = false,
+                    CreateNoWindow = false,
+                    WindowStyle = ProcessWindowStyle.Normal,
+                };
+                process = Process.Start(startinfo);
+            }
+            catch (Exception e)
+            {
+                log.LogMinimal("Could not start the process: " + e.Message + e.StackTrace);
+            }
+            finally
+            {
+                if (process != null)
+                {
+                    log.LogMinimal("Finally clause, hasExited:" + process.HasExited);
+                }
+                else
+                {
+                    log.LogMinimal("Finally clause, process is null");
+                }
+            }
+        }
+
         private async Task<bool> ExecuteAsync(Common.ILogger log)
         {
             if (RestoreGraphItems.Length < 1 && !HideWarningsAndErrors)
